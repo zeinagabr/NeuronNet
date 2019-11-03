@@ -1,6 +1,7 @@
 #include "network.h"
 #include "random.h"
 
+
 void Network::resize(const size_t &n, double inhib) {
     size_t old = size();
     neurons.resize(n);
@@ -61,6 +62,93 @@ size_t Network::random_connect(const double &mean_deg, const double &mean_streng
     }
     return num_links;
 }
+
+std::vector<std::pair<size_t, double> > Network::neighbors(const size_t& v) const
+{
+	std::vector< std::pair<size_t, double> > neighbors;
+	linkmap::const_iterator i1=links.lower_bound({v,0});
+	linkmap::const_iterator i2=links.lower_bound({v+1,0});
+	
+	 for(;i1->first!=i2->first; i1++)
+	 {
+				neighbors.push_back(std::make_pair((i1->first).second,i1->second));
+	 }
+	
+	return neighbors;
+	
+}
+
+std::pair<size_t, double> Network::degree(const size_t& v) const
+{
+	
+	double valence(0.0);
+	size_t counter(0);
+
+	linkmap::const_iterator i1=links.lower_bound({v,0});
+	linkmap::const_iterator i2=links.lower_bound({v+1,0}); 
+	
+	 for(;i1->first!=i2->first; i1++)
+	 {
+				++counter;
+				valence+= i1->second;
+	 }
+			
+	return std::make_pair(counter,valence);
+}
+    
+std::set<size_t> Network::step(const std::vector<double>& k)
+{
+	std::set<size_t> firing_neurons;
+	double sumE(0.0);
+	double sumI(0.0);
+	std::vector<double> new_k(k);
+		
+	if (k.size()==neurons.size())
+	{
+		for(size_t i(0); i<neurons.size(); ++i)
+			{	
+				
+				if (neurons[i].firing())
+				{
+					firing_neurons.insert(i);
+					neurons[i].reset();	
+				}	
+				
+				if (neurons[i].is_inhibitory())
+				{ 
+					new_k[i]=0.4*k[i];
+				}					
+				
+				sumI=0.0;
+				sumE=0.0;	
+				std::vector<std::pair<size_t, double> > neighbors_found(neighbors(i));
+
+				 for (size_t j(0);j<neighbors_found.size();++j)                                                                               
+                 {                                                                                                                    
+                     if(neurons[neighbors_found[j].first].firing())                                  
+                     {                                                                                                    
+							if(neurons[neighbors_found[j].first].is_inhibitory())       
+							{                                                                                
+								sumI+=neighbors_found[j].second; 
+							}else                                             
+							{                                                                                    
+								sumE+=neighbors_found[j].second;                                             
+							}                                                                                    
+					  }                                                                                                    
+                 }               
+				neurons[i].input(new_k[i]+0.5*sumE-sumI);
+			}
+	}
+	
+	
+	for(size_t i(0); i<neurons.size(); ++i)
+	{
+		neurons[i].step();
+	}
+	
+	return firing_neurons;
+}
+
 
 std::vector<double> Network::potentials() const {
     std::vector<double> vals;
